@@ -36,6 +36,11 @@ class User implements UserInterface
      */
     private $name;
 
+    /**
+     * @ORM\Column(type="string", length=20)
+     */
+    private $phone;
+
     public function getId(): ?int
     {
         return $this->id;
@@ -119,5 +124,32 @@ class User implements UserInterface
     {
         $this->name = $name;
         return $this;
+    }
+
+    public function getPhone(): ?string
+    {
+        return $this->phone;
+    }
+
+    public function setPhone(string $phone): self
+    {
+        $this->phone = $phone;
+
+        return $this;
+    }
+
+    ////////////////////////////////////////////////////////////////////////////
+
+    public function buildJSONArray(): array{
+        $_arr = array();
+
+        $_arr["id"] = $this->getId();
+        $_arr["name"] = $this->getName();
+        $_arr["email"] = $this->getEmail();
+        $_arr["phone"] = $this->getPhone();
+        $userRoles = $this->getRoles();
+        $_arr["role"] = $userRoles[1];
+
+        return $_arr;
     }
 }
