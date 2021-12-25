@@ -7,6 +7,10 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\Routing\Annotation\Route;
 
+use App\Entity\Order;
+use App\Entity\User;
+use App\Entity\OperationTrace;
+
 class OrderController extends AbstractController
 {
 
@@ -17,6 +21,21 @@ class OrderController extends AbstractController
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////
+    
+    
+    #[Route('/api/order/get_csrf_token', name: 'order_get_csrf_token', methods:"GET")]
+    public function getToken(Request $request) : JsonResponse
+    {
+        $csrf = $this->get('security.csrf.token_manager');
+        $token = $csrf->getToken('update-order-status')->getValue();
+
+        $responseData = array(
+          "status" => "OK",
+          "token" => $token
+        );
+
+        return new JsonResponse($responseData);
+    }
 
 
 
@@ -25,7 +44,7 @@ class OrderController extends AbstractController
     {
         $em = $this->getDoctrine()->getManager();
 
-        $orderCriterias = $this->getOrderCriteriasFromQuery();
+        $orderCriterias = $this->getOrderCriteriasFromQuery($request);
 
         $queryLimit = 21 ; // in Front-End, we print 20 results, we put the button "SEE MORE" if size or array is 21
         $queryOffset = $request->query->has('offset') ? $request->query->get('offset') : 0 ;
@@ -42,8 +61,10 @@ class OrderController extends AbstractController
           }
 
           $orders = array();
+          
 
-          $resultOrders = $repository->findBy(
+
+          $resultOrders = $em->getRepository(Order::class)->findBy(
             $orderCriterias,
             array('id' => $_orderBy),
             $queryLimit,
@@ -63,6 +84,7 @@ class OrderController extends AbstractController
 
         return new JsonResponse($responseData);
     }
+    
 
 
 
@@ -77,7 +99,7 @@ class OrderController extends AbstractController
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
-    #[Route('/api/order/set_validated', name: 'order_update_status', methods:"POST")]
+    #[Route('/api/order/set_validated', name: 'order_status_set_validated', methods:"POST")]
     public function setStatusValidated(Request $request): JsonResponse
     {
 
@@ -87,16 +109,23 @@ class OrderController extends AbstractController
           $this->checkValidationFields($request);
 
           // Updating order
-          $orderId = $request->request->has("_order_id") ? $request->request->get("_order_id") : null;
+          $data = json_decode($request->getContent(), true);
+    			$orderId = $data['_order_id'];
+    			
           $em = $this->getDoctrine()->getManager();
           $order = $em->getRepository(Order::class)->find($orderId);
+          
+//        $user = $this->getUser();
+					$user = $em->getRepository(User::class)->find(1);
 
           // set validation date
           $order->setValidationDate(new \DateTime());
           // set validated by
-          $order->setValidatedBy($this->getUser());
+          $order->setValidatedBy($user);
           // set status
           $order->setStatus("VALIDATED");
+
+          $this->createOperationTrace($user, "VALIDATE - #".$orderId);
 
           $em->flush();
 
@@ -115,40 +144,47 @@ class OrderController extends AbstractController
     }
 
 
-    #[Route('/api/order/set_shipped', name: 'order_update_status', methods:"POST")]
+    #[Route('/api/order/set_shipped', name: 'order_status_set_shipped', methods:"POST")]
     public function setStatusShipped(Request $request): JsonResponse
     {
         try{
 
           $this->checkTokenValidity($request);
-          $this->checkShipmentFields($request);
+          $this->checkShippingFields($request);
 
           // Updating order
-          $orderId = $request->request->has("_order_id") ? $request->request->get("_order_id") : null;
+					$data = json_decode($request->getContent(), true);
+    			$orderId = $data['_order_id'];
           $em = $this->getDoctrine()->getManager();
           $order = $em->getRepository(Order::class)->find($orderId);
+          
+//        $user = $this->getUser();
+					$user = $em->getRepository(User::class)->find(1);
 
 
           // set status : shipped
           $order->setStatus("SHIPPED");
 
           // set shipped by
-          $order->setShippeddBy($this->getUser());
+          $order->setShippedBy($user);
 
-          // set shipment date
-          $order->setShipmentDate(new \DateTime());
+          // set shipping date
+          $order->setShippingDate(new \DateTime());
 
           // set entrustedTo
-          $entrustedTo = $request->request->has("_entrusted_to") ? $request->request->get("_entrusted_to") : null;
+    			$entrustedTo = $data['_entrusted_to'];
           $userEntrustedTo = $em->getRepository(User::class)->find($entrustedTo);
           $order->setEntrustedTo($userEntrustedTo);
 
-
-          if($order->getCommune()->getWilaya()->getId() != 16){
-            $barcodeContent = $request->request->has("_barcode_content") ? $request->request->get("_barcode_content") : null;
-            $order->setBarcodeContent($barcodeContent);
-          }
           // set barcode
+          if($order->getCommune()->getWilaya()->getId() != 16){
+						$barcodeContent = $data['_barcode_content'];
+            $order->setDeliveryBarcode($barcodeContent);
+          }
+
+          $this->createOperationTrace($user, "SHIPPED - #".$orderId);
+
+          $em->flush();
 
 
           $responseData = array(
@@ -164,7 +200,7 @@ class OrderController extends AbstractController
         return new JsonResponse($responseData);
     }
 
-    #[Route('/api/order/set_delivered', name: 'order_update_status', methods:"POST")]
+    #[Route('/api/order/set_delivered', name: 'order_status_set_delivered', methods:"POST")]
     public function setStatusDelivered(Request $request): JsonResponse
     {
 
@@ -174,11 +210,23 @@ class OrderController extends AbstractController
           $this->checkDeliveryFields($request);
 
           // Updating order
-          $orderId = $request->request->has("_order_id") ? $request->request->get("_order_id") : null;
+					$data = json_decode($request->getContent(), true);
+    			$orderId = $data['_order_id'];
           $em = $this->getDoctrine()->getManager();
           $order = $em->getRepository(Order::class)->find($orderId);
+          
+          //$user = $this->getUser();
+					$user = $em->getRepository(User::class)->find(1);
 
+					$order->setStatus("DELIVERED");
           // set delivery date
+          $order->setDeliveryDate(new \DateTime());
+
+          $order->setDeliveredBy($user);
+
+          $this->createOperationTrace($user, "DELIVERED - #".$orderId);
+
+          $em->flush();
 
 
           $responseData = array(
@@ -195,7 +243,7 @@ class OrderController extends AbstractController
     }
 
 
-    #[Route('/api/order/set_returned', name: 'order_update_status', methods:"POST")]
+    #[Route('/api/order/set_returned', name: 'order_status_set_returned', methods:"POST")]
     public function setStatusReturned(Request $request): JsonResponse
     {
         try{
@@ -204,12 +252,72 @@ class OrderController extends AbstractController
           $this->checkReturnFields($request);
 
           // Updating order
-          $orderId = $request->request->has("_order_id") ? $request->request->get("_order_id") : null;
+          $data = json_decode($request->getContent(), true);
+    			$orderId = $data['_order_id'];
           $em = $this->getDoctrine()->getManager();
           $order = $em->getRepository(Order::class)->find($orderId);
+          
+          $order->setStatus("RETURNED");
 
-          // set return date
-          // set returned by
+          //$user = $this->getUser();
+					$user = $em->getRepository(User::class)->find(1);
+
+
+          // set delivery date
+          $order->setReturnDate(new \DateTime());
+
+          $order->setReturnedBy($user);
+
+          $this->createOperationTrace($user, "RETURNED - #".$orderId);
+
+          $em->flush();
+
+
+          $responseData = array(
+            "status" => "OK"
+          );
+        }catch(\Exception $e){
+          $responseData = array(
+            "status" => "ERR",
+            "err" => $e->getMessage()
+          );
+        }
+
+        return new JsonResponse($responseData);
+    }
+    
+    
+    
+    #[Route('/api/order/set_canceled', name: 'order_status_set_canceled', methods:"POST")]
+    public function setStatusCanceled(Request $request): JsonResponse
+    {
+
+        try{
+
+          $this->checkTokenValidity($request);
+          $this->checkCancelFields($request);
+
+          // Updating order
+          $data = json_decode($request->getContent(), true);
+    			$orderId = $data['_order_id'];
+          $em = $this->getDoctrine()->getManager();
+          $order = $em->getRepository(Order::class)->find($orderId);
+          
+          $order->setStatus("CANCELED");
+          
+          //$user = $this->getUser();
+					$user = $em->getRepository(User::class)->find(1);
+
+          // set validation date
+          $order->setCancelDate(new \DateTime());
+          // set validated by
+          $order->setCanceledBy($user);
+          // set status
+          $order->setStatus("CANCELED");
+
+          $this->createOperationTrace($user, "CANCEL - #".$orderId);
+
+          $em->flush();
 
 
           $responseData = array(
@@ -240,8 +348,11 @@ class OrderController extends AbstractController
 
 
     private function checkTokenValidity(Request $request) : void{
+    
+				$data = json_decode($request->getContent(), true);
+				$_token = $data['_token'];
 
-        $_token = $request->request->has('_token')?$request->request->get('_token'):null;
+        //$_token = $request->request->has('_token')?$request->request->get('_token'):null;
 
         if(!($this->isCsrfTokenValid('update-order-status', $_token))){
           throw new \Exception('ERR_VALIDATION');
@@ -252,7 +363,13 @@ class OrderController extends AbstractController
 
     private function checkValidationFields(Request $request) : void
     {
-        $orderId = $request->request->has("_order_id") ? $request->request->get("_order_id") : null;
+    		$data = json_decode($request->getContent(), true);
+    		$orderId = null;
+    		
+    		if(array_key_exists('_order_id', $data)){
+					$orderId = $data['_order_id'];
+				}
+				
         if($orderId == null){
           throw new \Exception("ERR_INPUT_ORDER");
         }
@@ -262,6 +379,10 @@ class OrderController extends AbstractController
         $order = $em->getRepository(Order::class)->find($orderId);
         if($order == null){
           throw new \Exception("ERR_NO_MATCHING_ORDER");
+        }else{
+        	if($order->getStatus() != "SAVED"){
+        		throw new \Exception("ERR_ORDER_STATUS_MISUSE");
+        	}
         }
 
         if($order->getValidationDate()){
@@ -269,9 +390,14 @@ class OrderController extends AbstractController
         }
     }
 
-    private function checkShipmentFields(Request $request) : void
+    private function checkShippingFields(Request $request) : void
     {
-        $orderId = $request->request->has("_order_id") ? $request->request->get("_order_id") : null;
+        $data = json_decode($request->getContent(), true);
+    		$orderId = null;
+    		
+    		if(array_key_exists('_order_id', $data)){
+					$orderId = $data['_order_id'];
+				}
         if($orderId == null){
           throw new \Exception("ERR_INPUT_ORDER");
         }
@@ -280,16 +406,54 @@ class OrderController extends AbstractController
         $order = $em->getRepository(Order::class)->find($orderId);
         if($order == null){
           throw new \Exception("ERR_NO_MATCHING_ORDER");
+        }else{
+					if($order->getCommune()->getWilaya()->getId() != 16){
+						$barcodeContent = null;
+					  if(array_key_exists('_barcode_content', $data)){
+							$barcodeContent = $data['_barcode_content'];
+							if(!(strlen($barcodeContent) > 1)){
+								$barcodeContent = null;
+							}
+						}
+					  if($barcodeContent == null){
+					    throw new \Exception("ERR_INPUT_BARCODE");
+					  }
+          }
+          
+          
+        	if($order->getStatus() != "VALIDATED"){
+        		throw new \Exception("ERR_ORDER_STATUS_MISUSE");
+        	}
+        
+        }
+        
+        $entrustedTo = null;
+        if(array_key_exists('_entrusted_to', $data)){
+					$entrustedTo = $data['_entrusted_to'];
+				}
+        if($entrustedTo == null){
+          throw new \Exception("ERR_INPUT_ENTRUST_TO");
         }
 
-        if($order->getShipmentDate()){
+        $em = $this->getDoctrine()->getManager();
+        $user = $em->getRepository(User::class)->find($entrustedTo);
+        if($user == null){
+          throw new \Exception("ERR_NO_MATCHING_USER");
+        }
+
+        if($order->getShippingDate()){
           throw new \Exception("ERR_ALREADY_SHIPPED");
         }
     }
 
     private function checkDeliveryFields(Request $request) : void
     {
-        $orderId = $request->request->has("_order_id") ? $request->request->get("_order_id") : null;
+        $data = json_decode($request->getContent(), true);
+    		$orderId = null;
+    		
+    		if(array_key_exists('_order_id', $data)){
+					$orderId = $data['_order_id'];
+				}
         if($orderId == null){
           throw new \Exception("ERR_INPUT_ORDER");
         }
@@ -298,6 +462,10 @@ class OrderController extends AbstractController
         $order = $em->getRepository(Order::class)->find($orderId);
         if($order == null){
           throw new \Exception("ERR_NO_MATCHING_ORDER");
+        }else{
+        	if($order->getStatus() != "SHIPPED"){
+        		throw new \Exception("ERR_ORDER_STATUS_MISUSE");
+        	}
         }
 
         if($order->getDeliveryDate()){
@@ -307,7 +475,12 @@ class OrderController extends AbstractController
 
     private function checkReturnFields(Request $request) : void
     {
-        $orderId = $request->request->has("_order_id") ? $request->request->get("_order_id") : null;
+        $data = json_decode($request->getContent(), true);
+    		$orderId = null;
+    		
+    		if(array_key_exists('_order_id', $data)){
+					$orderId = $data['_order_id'];
+				}
         if($orderId == null){
           throw new \Exception("ERR_INPUT_ORDER");
         }
@@ -316,10 +489,44 @@ class OrderController extends AbstractController
         $order = $em->getRepository(Order::class)->find($orderId);
         if($order == null){
           throw new \Exception("ERR_NO_MATCHING_ORDER");
+        }else{
+        	if($order->getStatus() != "SHIPPED"){
+        		throw new \Exception("ERR_ORDER_STATUS_MISUSE");
+        	}
         }
 
         if($order->getReturnDate()){
           throw new \Exception("ERR_ALREADY_RETURNED");
+        }
+    }
+    
+    
+    private function checkCancelFields(Request $request) : void
+    {
+    		$data = json_decode($request->getContent(), true);
+    		$orderId = null;
+    		
+    		if(array_key_exists('_order_id', $data)){
+					$orderId = $data['_order_id'];
+				}
+				
+        if($orderId == null){
+          throw new \Exception("ERR_INPUT_ORDER");
+        }
+
+        $em = $this->getDoctrine()->getManager();
+
+        $order = $em->getRepository(Order::class)->find($orderId);
+        if($order == null){
+          throw new \Exception("ERR_NO_MATCHING_ORDER");
+        }else{
+        	if($order->getStatus() == "RETURNED" || $order->getStatus() == "CANCELED" || $order->getStatus() == "DELIVERED"){
+        		throw new \Exception("ERR_ORDER_STATUS_MISUSE");
+        	}
+        }
+
+        if($order->getValidationDate()){
+          throw new \Exception("ERR_ALREADY_VALIDATED");
         }
     }
 
@@ -331,8 +538,8 @@ class OrderController extends AbstractController
     private function getOrderCriteriasFromQuery(Request $request) : ?array{
       $_arr = array();
 
-      $queryStatus = $request->query->has('status')?$request->query->has('status'):null;
-      $queryCustomerPhone = $request->query->has('customer_phone')?$request->query->has('customer_phone'):null;
+      $queryStatus = $request->query->has('status')?$request->query->get('status'):null;
+      $queryCustomerPhone = $request->query->has('customer_phone')?$request->query->get('customer_phone'):null;
 
       // CRITERIA : STATUS
       if(($queryStatus == "SAVED")
@@ -360,6 +567,19 @@ class OrderController extends AbstractController
         return null;
       }
 
+    }
+
+
+    private function createOperationTrace(User $user, string $operation){
+    	$em = $this->getDoctrine()->getManager();
+    
+      $operationTrace = new OperationTrace();
+      $operationTrace->setUser($user);
+      $operationTrace->setDate(new \DateTime());
+      $operationTrace->setOperation($operation);
+
+      $em->persist($operationTrace);
+      $em->flush();
     }
 
 

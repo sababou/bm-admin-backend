@@ -99,7 +99,7 @@ class Order
     /**
      * @ORM\Column(type="datetime", nullable=true)
      */
-    private $shipmentDate;
+    private $shippingDate;
 
     /**
      * @ORM\ManyToOne(targetEntity=User::class)
@@ -140,6 +140,11 @@ class Order
      * @ORM\Column(type="string", length=255, nullable=true)
      */
     private $cookieToken;
+
+    /**
+     * @ORM\Column(type="string", length=255, nullable=true)
+     */
+    private $picture;
 
     public function __construct()
     {
@@ -331,14 +336,14 @@ class Order
         return $this;
     }
 
-    public function getShipmentDate(): ?\DateTimeInterface
+    public function getShippingDate(): ?\DateTimeInterface
     {
-        return $this->shipmentDate;
+        return $this->shippingDate;
     }
 
-    public function setShipmentDate(?\DateTimeInterface $shipmentDate): self
+    public function setShippingDate(?\DateTimeInterface $shippingDate): self
     {
-        $this->shipmentDate = $shipmentDate;
+        $this->shippingDate = $shippingDate;
 
         return $this;
     }
@@ -436,7 +441,7 @@ class Order
       $_arr["validated_by"] = $this->getValidatedBy() ? $this->getValidatedBy()->buildJSONArray() : null;
       $_arr["validation_date"] = $this->getValidationDate() ? $this->getValidationDate()->format('Y-m-d H:i:s') : null;
       $_arr["shipped_by"] = $this->getShippeddBy() ? $this->getShippeddBy()->buildJSONArray() : null;
-      $_arr["shipment_date"] = $this->getShipmentDate() ? $this->getShipmentDate()->format('Y-m-d H:i:s') : null;
+      $_arr["shipping_date"] = $this->getShippingDate() ? $this->getShippingDate()->format('Y-m-d H:i:s') : null;
       $_arr["delivered_by"] = $this->getDeliveredBy() ? $this->getDeliveredBy()->buildJSONArray() : null;
       $_arr["delivery_date"] = $this->getDeliveryDate() ? $this->getDeliveryDate()->format('Y-m-d H:i:s') : null;
       $_arr["returned_by"] = $this->getReturnedBy() ? $this->getReturnedBy()->buildJSONArray() : null;
@@ -496,6 +501,18 @@ class Order
     public function setCookieToken(?string $cookieToken): self
     {
         $this->cookieToken = $cookieToken;
+
+        return $this;
+    }
+
+    public function getPicture(): ?string
+    {
+        return $this->picture;
+    }
+
+    public function setPicture(?string $picture): self
+    {
+        $this->picture = $picture;
 
         return $this;
     }

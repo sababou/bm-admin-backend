@@ -1,6 +1,8 @@
 <?php
 
 namespace App\Entity;
+use Doctrine\Common\Collections\ArrayCollection;
+use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Security\Core\User\UserInterface;
 /**
@@ -40,6 +42,16 @@ class User implements UserInterface
      * @ORM\Column(type="string", length=20)
      */
     private $phone;
+
+    /**
+     * @ORM\OneToMany(targetEntity=OperationTrace::class, mappedBy="user")
+     */
+    private $operationTraces;
+
+    public function __construct()
+    {
+        $this->operationTraces = new ArrayCollection();
+    }
 
     public function getId(): ?int
     {
@@ -147,9 +159,38 @@ class User implements UserInterface
         $_arr["name"] = $this->getName();
         $_arr["email"] = $this->getEmail();
         $_arr["phone"] = $this->getPhone();
-        $userRoles = $this->getRoles();
-        $_arr["role"] = $userRoles[1];
+        $_arr["roles"] = $this->getRoles();
 
         return $_arr;
+    }
+
+    /**
+     * @return Collection|OperationTrace[]
+     */
+    public function getOperationTraces(): Collection
+    {
+        return $this->operationTraces;
+    }
+
+    public function addOperationTrace(OperationTrace $operationTrace): self
+    {
+        if (!$this->operationTraces->contains($operationTrace)) {
+            $this->operationTraces[] = $operationTrace;
+            $operationTrace->setUser($this);
+        }
+
+        return $this;
+    }
+
+    public function removeOperationTrace(OperationTrace $operationTrace): self
+    {
+        if ($this->operationTraces->removeElement($operationTrace)) {
+            // set the owning side to null (unless already changed)
+            if ($operationTrace->getUser() === $this) {
+                $operationTrace->setUser(null);
+            }
+        }
+
+        return $this;
     }
 }

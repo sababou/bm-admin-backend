@@ -31,7 +31,7 @@ class StaffMemberController extends AbstractController
 
 
     /**
-     * @Route("/staff_member/get_csrf_token", methods={"GET"})
+     * @Route("/api/staff_member/get_csrf_token", methods={"GET"})
      */
     public function getToken(Request $request) : JsonResponse
     {
@@ -48,12 +48,13 @@ class StaffMemberController extends AbstractController
 
 
     /**
-     * @Route("/staff_member/list", methods={"GET"})
+     * @Route("/api/staff_member/list", methods={"GET"})
      */
     public function getStaffMemberList(Request $request) : JsonResponse
     {
 
         $role = $this->getRoleFromQuery($request);
+
 
         $users = array();
 
@@ -66,7 +67,10 @@ class StaffMemberController extends AbstractController
         }
 
         foreach($resultUsers as $user){
-          $users[] = $user->buildJSONArray();
+        	$userArr = $user->buildJSONArray();
+        	$userArr['last_login'] = "14/11/2021 08:32";
+        	$userArr['last_operation'] = array("operation_type" => "validation", "operation_date" => "14/11/2021 11:36");
+          $users[] = $userArr;
         }
 
 
@@ -89,21 +93,21 @@ class StaffMemberController extends AbstractController
 
 
     /**
-     * @Route("/staff_member/add", name="staff_member_add", methods={"POST"})
+     * @Route("/api/staff_member/add", name="staff_member_add", methods={"POST"})
      */
     public function addMember(Request $request) : JsonResponse
     {
+        $data = json_decode($request->getContent(), true);
 
         try{
 
-          $this->checkTokenValidity($request);
-          $this->checkAddUserFields($request);
-
+          $this->checkTokenValidity($data);
+          $this->checkAddUserFields($data);
 
           $em = $this->getDoctrine()->getManager();
 
           // If there is no error, we build & save a new User
-          $user = $this->buildUserFromRequest($request);
+          $user = $this->buildUserFromRequest($data);
 
           $em = $this->getDoctrine()->getManager();
           $em->persist($user);
@@ -112,7 +116,6 @@ class StaffMemberController extends AbstractController
           $responseData = array(
             "status" => "OK"
           );
-
 
         }catch(\Exception $e){
           $responseData = array(
@@ -135,9 +138,11 @@ class StaffMemberController extends AbstractController
     /////////////////////////////////////////////////////////////////////////////////////////////////////////////
     /////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    private function checkTokenValidity(Request $request) : void{
+    private function checkTokenValidity(array $data) : void{
 
-        $_token = $request->request->has('_token')?$request->request->get('_token'):null;
+
+
+        $_token = $data['_token'];
 
         if(!($this->isCsrfTokenValid('staff-member', $_token))){
           throw new \Exception('ERR_VALIDATION');
@@ -145,17 +150,26 @@ class StaffMemberController extends AbstractController
 
     }
 
-    private function checkAddUserFields(Request $request) : void{
+    private function checkAddUserFields(array $data) : void{
 
         $_err = null;
 
         // PARAMS recieved from POST request
-        $email = $request->request->has('_email')?$request->request->get('_email'):null;
-        $password = $request->request->has('_password')?$request->request->get('_password'):null;
-        $name = $request->request->has('_name')?$request->request->get('_name'):null;
-        $role = $request->request->has('_role')?$request->request->get('_role'):null;
+        $email = array_key_exists('_email', $data) ? $data['_email'] : null ;
+        $password = array_key_exists('_password', $data) ? $data['_password'] : null ;
+        $name = array_key_exists('_name', $data) ? $data['_name'] : null ;
+        $phone = array_key_exists('_phone', $data) ? $data['_phone'] : null ;
+        $role = array_key_exists('_role', $data) ? $data['_role'] : null ;
 
         // fields verification
+        if (strlen($name) < 3) {
+          throw new \Exception('ERR_INPUT_NAME');
+        }
+
+        if(!preg_match("/^[0]{1}[0-9]{9}$/", $phone)) {
+          throw new \Exception('ERR_INPUT_PHONE');
+        }
+
         if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
           throw new \Exception('ERR_INPUT_EMAIL');
         }else{
@@ -170,15 +184,16 @@ class StaffMemberController extends AbstractController
           throw new \Exception('ERR_INPUT_PASSWORD');
         }
 
-        if (strlen($name) < 3) {
-          throw new \Exception('ERR_INPUT_NAME');
-        }
 
         if(($role != "ROLE_VALIDATION")
-              && ($role != "ROLE_SHIPMENT")
-              && ($role != "ROLE_DELIVERY")
-              && ($role != "ROLE_RETURN")
-              && ($role != "ROLE_CUSTOMER_SERVICE")){
+              && ($role != "ROLE_SHIPPING")
+              && ($role != "ROLE_DELIVERY_ENTRUST")
+              && ($role != "ROLE_DELIVERY_DONE")
+              && ($role != "ROLE_CANCEL")
+              && ($role != "ROLE_RETURN")){
+
+
+
 
           throw new \Exception('ERR_INPUT_ROLE');
 
@@ -186,18 +201,19 @@ class StaffMemberController extends AbstractController
     }
 
 
-    private function buildUserFromRequest(Request $request) : User {
+    private function buildUserFromRequest(array $data) : User {
 
-        $email = $request->request->get('_email');
-        $password = $request->request->get('_password');
-        $name = $request->request->get('_name');
-        $phone = $request->request->get('_phone');
-        $role = $request->request->get('_role');
+        $email = $data['_email'];
+        $password = $data['_password'];
+        $name = $data['_name'];
+        $phone = $data['_phone'];
+        $role = $data['_role'];
 
         $user = new User();
 
         $user->setEmail($email);
         $user->setName($name);
+        $user->setPhone($phone);
         // Encode the new users password
         $user->setPassword($this->passwordEncoder->encodePassword($user, $password));
 
@@ -212,11 +228,13 @@ class StaffMemberController extends AbstractController
     private function getRoleFromQuery(Request $request) : ?string{
       $role = null;
 
-      $queryRole = $request->query->has('role')?$request->query->has('role'):null;
+      $queryRole = $request->query->has('role')?$request->query->get('role'):null;
 
       if(($queryRole == "ROLE_VALIDATION")
-          || ($queryRole == "ROLE_SHIPMENT")
-          || ($queryRole == "ROLE_DELIVERY")
+          || ($queryRole == "ROLE_SHIPPING")
+          || ($queryRole == "ROLE_DELIVERY_ENTRUST")
+          || ($queryRole == "ROLE_DELIVERY_DONE")
+          || ($queryRole == "ROLE_CANCEL")
           || ($queryRole == "ROLE_RETURN")){
 
         $role = $queryRole;
