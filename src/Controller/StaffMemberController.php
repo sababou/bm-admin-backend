@@ -68,8 +68,16 @@ class StaffMemberController extends AbstractController
 
         foreach($resultUsers as $user){
         	$userArr = $user->buildJSONArray();
-        	$userArr['last_login'] = "14/11/2021 08:32";
-        	$userArr['last_operation'] = array("operation_type" => "validation", "operation_date" => "14/11/2021 11:36");
+
+        	$lastLogin = $em->getRepository(LoginTrace::class)->findOneByUser($user, ["id"=>"DESC"]);
+        	$lastOperation = $em->getRepository(LoginTrace::class)->findOneByUser($user, ["id"=>"DESC"]);
+
+        	$userArr['last_login'] = $lastLogin->getDate()->format('Y-m-d H:i:s');
+        	$userArr['last_operation'] = array(
+        																"operation_type" => $lastOperation->getOperation(), 
+        																"operation_date" => $lastOperation->getDate()->format('Y-m-d H:i:s')
+      																);
+
           $users[] = $userArr;
         }
 
