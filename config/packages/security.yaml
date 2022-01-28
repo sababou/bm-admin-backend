@@ -39,12 +39,13 @@ security:
 
             # https://symfony.com/doc/current/security/impersonating_user.html
             # switch_user: true
+            
+    role_hierarchy:
+        ROLE_ADMIN: [ROLE_SHIPPING, ROLE_DELIVERY_ENTRUST, ROLE_DELIVERY_DONE, ROLE_CANCEL, ROLE_RETURN]
 
     # Easy way to control access for large sections of your site
     # Note: Only the *first* access control that matches will be used
     access_control:
         - { path: ^/api/login, roles: IS_AUTHENTICATED_ANONYMOUSLY }
-        - { path: ^/api/first_step_login, roles: IS_AUTHENTICATED_ANONYMOUSLY }
-        - { path: ^/api/second_step_login, roles: IS_AUTHENTICATED_ANONYMOUSLY }
-        - { path: ^/api,       roles: IS_AUTHENTICATED_FULLY }
+        - { path: ^/api/staff_member, roles: ROLE_ADMIN }
 

@@ -31,23 +31,6 @@ class StaffMemberController extends AbstractController
 
 
     /**
-     * @Route("/api/staff_member/get_csrf_token", methods={"GET"})
-     */
-    public function getToken(Request $request) : JsonResponse
-    {
-        $csrf = $this->get('security.csrf.token_manager');
-        $token = $csrf->getToken('staff-member')->getValue();
-
-        $responseData = array(
-          "status" => "OK",
-          "token" => $token
-        );
-
-        return new JsonResponse($responseData);
-    }
-
-
-    /**
      * @Route("/api/staff_member/list", methods={"GET"})
      */
     public function getStaffMemberList(Request $request) : JsonResponse
@@ -74,7 +57,7 @@ class StaffMemberController extends AbstractController
 
         	$userArr['last_login'] = $lastLogin->getDate()->format('Y-m-d H:i:s');
         	$userArr['last_operation'] = array(
-        																"operation_type" => $lastOperation->getOperation(), 
+        																"operation_type" => $lastOperation->getOperation(),
         																"operation_date" => $lastOperation->getDate()->format('Y-m-d H:i:s')
       																);
 
@@ -109,7 +92,6 @@ class StaffMemberController extends AbstractController
 
         try{
 
-          $this->checkTokenValidity($data);
           $this->checkAddUserFields($data);
 
           $em = $this->getDoctrine()->getManager();
@@ -146,17 +128,6 @@ class StaffMemberController extends AbstractController
     /////////////////////////////////////////////////////////////////////////////////////////////////////////////
     /////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    private function checkTokenValidity(array $data) : void{
-
-
-
-        $_token = $data['_token'];
-
-        if(!($this->isCsrfTokenValid('staff-member', $_token))){
-          throw new \Exception('ERR_VALIDATION');
-        }
-
-    }
 
     private function checkAddUserFields(array $data) : void{
 

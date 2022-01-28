@@ -21,21 +21,7 @@ class OrderController extends AbstractController
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////
-    
-    
-    #[Route('/api/order/get_csrf_token', name: 'order_get_csrf_token', methods:"GET")]
-    public function getToken(Request $request) : JsonResponse
-    {
-        $csrf = $this->get('security.csrf.token_manager');
-        $token = $csrf->getToken('update-order-status')->getValue();
 
-        $responseData = array(
-          "status" => "OK",
-          "token" => $token
-        );
-
-        return new JsonResponse($responseData);
-    }
 
 
 
@@ -61,7 +47,7 @@ class OrderController extends AbstractController
           }
 
           $orders = array();
-          
+
 
 
           $resultOrders = $em->getRepository(Order::class)->findBy(
@@ -85,8 +71,34 @@ class OrderController extends AbstractController
         return new JsonResponse($responseData);
     }
     
+    
+    /**
+     * @Route("/api/order/entrusted_to_list", methods={"GET"})
+     */
+    public function getEntrustedToList(Request $request) : JsonResponse
+    {
+
+        $users = array();
+
+        $em = $this->getDoctrine()->getManager();
+
+        $resultUsers = $em->getRepository(User::class)->findAllByRole("ROLE_ENTRUSTED_TO");
+
+        foreach($resultUsers as $user){
+        	$userArr = $user->buildJSONArray();
 
 
+          $users[] = $userArr;
+        }
+
+
+        $responseData = array(
+          "status" => "OK",
+          "users" => $users
+        );
+
+        return new JsonResponse($responseData);
+    }
 
 
 
@@ -105,16 +117,15 @@ class OrderController extends AbstractController
 
         try{
 
-          $this->checkTokenValidity($request);
           $this->checkValidationFields($request);
 
           // Updating order
           $data = json_decode($request->getContent(), true);
     			$orderId = $data['_order_id'];
-    			
+
           $em = $this->getDoctrine()->getManager();
           $order = $em->getRepository(Order::class)->find($orderId);
-          
+
 //        $user = $this->getUser();
 					$user = $em->getRepository(User::class)->find(1);
 
@@ -149,7 +160,6 @@ class OrderController extends AbstractController
     {
         try{
 
-          $this->checkTokenValidity($request);
           $this->checkShippingFields($request);
 
           // Updating order
@@ -157,7 +167,7 @@ class OrderController extends AbstractController
     			$orderId = $data['_order_id'];
           $em = $this->getDoctrine()->getManager();
           $order = $em->getRepository(Order::class)->find($orderId);
-          
+
 //        $user = $this->getUser();
 					$user = $em->getRepository(User::class)->find(1);
 
@@ -206,7 +216,6 @@ class OrderController extends AbstractController
 
         try{
 
-          $this->checkTokenValidity($request);
           $this->checkDeliveryFields($request);
 
           // Updating order
@@ -214,7 +223,7 @@ class OrderController extends AbstractController
     			$orderId = $data['_order_id'];
           $em = $this->getDoctrine()->getManager();
           $order = $em->getRepository(Order::class)->find($orderId);
-          
+
           //$user = $this->getUser();
 					$user = $em->getRepository(User::class)->find(1);
 
@@ -248,7 +257,6 @@ class OrderController extends AbstractController
     {
         try{
 
-          $this->checkTokenValidity($request);
           $this->checkReturnFields($request);
 
           // Updating order
@@ -256,7 +264,7 @@ class OrderController extends AbstractController
     			$orderId = $data['_order_id'];
           $em = $this->getDoctrine()->getManager();
           $order = $em->getRepository(Order::class)->find($orderId);
-          
+
           $order->setStatus("RETURNED");
 
           //$user = $this->getUser();
@@ -285,16 +293,15 @@ class OrderController extends AbstractController
 
         return new JsonResponse($responseData);
     }
-    
-    
-    
+
+
+
     #[Route('/api/order/set_canceled', name: 'order_status_set_canceled', methods:"POST")]
     public function setStatusCanceled(Request $request): JsonResponse
     {
 
         try{
 
-          $this->checkTokenValidity($request);
           $this->checkCancelFields($request);
 
           // Updating order
@@ -302,9 +309,9 @@ class OrderController extends AbstractController
     			$orderId = $data['_order_id'];
           $em = $this->getDoctrine()->getManager();
           $order = $em->getRepository(Order::class)->find($orderId);
-          
+
           $order->setStatus("CANCELED");
-          
+
           //$user = $this->getUser();
 					$user = $em->getRepository(User::class)->find(1);
 
@@ -347,29 +354,15 @@ class OrderController extends AbstractController
     /////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
-    private function checkTokenValidity(Request $request) : void{
-    
-				$data = json_decode($request->getContent(), true);
-				$_token = $data['_token'];
-
-        //$_token = $request->request->has('_token')?$request->request->get('_token'):null;
-
-        if(!($this->isCsrfTokenValid('update-order-status', $_token))){
-          throw new \Exception('ERR_VALIDATION');
-        }
-
-    }
-
-
     private function checkValidationFields(Request $request) : void
     {
     		$data = json_decode($request->getContent(), true);
     		$orderId = null;
-    		
+
     		if(array_key_exists('_order_id', $data)){
 					$orderId = $data['_order_id'];
 				}
-				
+
         if($orderId == null){
           throw new \Exception("ERR_INPUT_ORDER");
         }
@@ -394,7 +387,7 @@ class OrderController extends AbstractController
     {
         $data = json_decode($request->getContent(), true);
     		$orderId = null;
-    		
+
     		if(array_key_exists('_order_id', $data)){
 					$orderId = $data['_order_id'];
 				}
@@ -419,14 +412,14 @@ class OrderController extends AbstractController
 					    throw new \Exception("ERR_INPUT_BARCODE");
 					  }
           }
-          
-          
+
+
         	if($order->getStatus() != "VALIDATED"){
         		throw new \Exception("ERR_ORDER_STATUS_MISUSE");
         	}
-        
+
         }
-        
+
         $entrustedTo = null;
         if(array_key_exists('_entrusted_to', $data)){
 					$entrustedTo = $data['_entrusted_to'];
@@ -450,7 +443,7 @@ class OrderController extends AbstractController
     {
         $data = json_decode($request->getContent(), true);
     		$orderId = null;
-    		
+
     		if(array_key_exists('_order_id', $data)){
 					$orderId = $data['_order_id'];
 				}
@@ -477,7 +470,7 @@ class OrderController extends AbstractController
     {
         $data = json_decode($request->getContent(), true);
     		$orderId = null;
-    		
+
     		if(array_key_exists('_order_id', $data)){
 					$orderId = $data['_order_id'];
 				}
@@ -499,17 +492,17 @@ class OrderController extends AbstractController
           throw new \Exception("ERR_ALREADY_RETURNED");
         }
     }
-    
-    
+
+
     private function checkCancelFields(Request $request) : void
     {
     		$data = json_decode($request->getContent(), true);
     		$orderId = null;
-    		
+
     		if(array_key_exists('_order_id', $data)){
 					$orderId = $data['_order_id'];
 				}
-				
+
         if($orderId == null){
           throw new \Exception("ERR_INPUT_ORDER");
         }
@@ -572,7 +565,7 @@ class OrderController extends AbstractController
 
     private function createOperationTrace(User $user, string $operation){
     	$em = $this->getDoctrine()->getManager();
-    
+
       $operationTrace = new OperationTrace();
       $operationTrace->setUser($user);
       $operationTrace->setDate(new \DateTime());

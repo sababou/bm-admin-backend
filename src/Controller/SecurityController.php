@@ -25,43 +25,31 @@ class SecurityController extends AbstractController
     public function login(Request $request, JWTTokenManagerInterface $JWTManager): JsonResponse
     {
         $data = json_decode($request->getContent(), true);
-    		
-        //$userPhone = array_key_exists("_phone", $data) ? $data['_phone'] : 0;
-        //$token = array_key_exists("_token", $data) ? $data['_token'] : 0;
-        
-        $userPhone = $request->query->get('_phone');
-        $token = $request->query->get('_token');
+
+        $_phone = array_key_exists("_phone", $data) ? $data['_phone'] : 0;
+        $_loginToken = array_key_exists("_token", $data) ? $data['_token'] : 0;
 
         $_err = null;
         $_token = null;
+        $_userdata = null;
 
         $em = $this->getDoctrine()->getManager();
 
-        $user = $em->getRepository(User::class)->findOneByPhone($userPhone);
+        $user = $em->getRepository(User::class)->findOneByPhone($_phone);
 
         if($user){
 
-          $loginToken = $em->getRepository(LoginToken::class)->findOneByToken($token);
+          $loginToken = $em->getRepository(LoginToken::class)->findOneByToken($_loginToken);
 
           if($loginToken){
-          
+
           	if (new \DateTime() > $loginToken->getLimitDate()) {
 							$_status = "ERR";
             	$_err = "TOKEN_EXPIRED";
 						} else {
-						
-						/*
-							$guardHandler->authenticateUserAndHandleSuccess(
-                $user,
-                $request,
-                $loginAuthenticator,
-                'main'
-            	);
-            	*/
-            	//$JWTManager->create($user)
-							$_token = $JWTManager->create($user,10);
-            	
-			        
+
+							$_token = $JWTManager->create($user);
+
 			        $loginTrace = new LoginTrace();
 		          $loginTrace->setUser($user);
 		          $loginTrace->setDate(new \DateTime());
@@ -69,10 +57,15 @@ class SecurityController extends AbstractController
 
 		          $em->persist($loginTrace);
 		          $em->flush();
+		          
+		          $_userdata = array(
+		          	"user_name" => $user->getName(),
+		          	"user_roles" => $user->getRoles()
+		          );
 
 		          $_status = "OK";
-						}  
-            
+						}
+
           }else{
             $_status = "ERR";
             $_err = "NO_MATCHING_TOKEN";
@@ -86,114 +79,26 @@ class SecurityController extends AbstractController
         $responseData = array(
           "status" => $_status,
           "error" => $_err,
-          "token" => $_token
-        );
-
-        $response = new JsonResponse($responseData);
-        return $response;
-    }
-
-
-
-    #[Route('/api/first_step_login', name: 'first_step_login')]
-    public function firstStepLogin(Request $request): JsonResponse
-    {
-        $data = json_decode($request->getContent(), true);
-        $userPhone = array_key_exists("_phone", $data) ? $data['_phone']:0;
-        $_username = "";
-
-        $_err = null;
-
-        $em = $this->getDoctrine()->getManager();
-
-        $user = $em->getRepository(User::class)->findOneByPhone($userPhone);
-
-
-        if($user){
-          $_status = "OK";
-          $_username = $user->getName();
-        }else{
-          $_status = "ERR";
-          $_err = "NO_MATCHING_USER";
-        }
-
-        $responseData = array(
-          "status" => $_status,
-          "error" => $_err,
-          "user_name" => $_username
-        );
-
-        $response = new JsonResponse($responseData);
-        return $response;
-    }
-
-
-    #[Route('/api/second_step_login', name: 'second_step_login')]
-    public function secondStepLogin(Request $request, GuardAuthenticatorHandler $guardHandler, LoginFormAuthenticator $loginAuthenticator): JsonResponse
-    {
-    		$data = json_decode($request->getContent(), true);
-    		
-        //$userPhone = array_key_exists("_phone", $data) ? $data['_phone'] : 0;
-        //$token = array_key_exists("_token", $data) ? $data['_token'] : 0;
-        
-        $userPhone = $request->query->get('_phone');
-        $token = $request->query->get('_token');
-
-        $_err = null;
-        $_token = null;
-
-        $em = $this->getDoctrine()->getManager();
-
-        $user = $em->getRepository(User::class)->findOneByPhone($userPhone);
-
-        if($user){
-
-          $loginToken = $em->getRepository(LoginToken::class)->findOneByToken($token);
-
-          if($loginToken){
+          "token" => $_token,
+          "userdata" => $_userdata
           
-          	if (new \DateTime() > $loginToken->getLimitDate()) {
-							$_status = "ERR";
-            	$_err = "TOKEN_EXPIRED";
-						} else {
-						
-						/*
-							$guardHandler->authenticateUserAndHandleSuccess(
-                $user,
-                $request,
-                $loginAuthenticator,
-                'main'
-            	);
-            	*/
-            	
-							$_token = $this->get("lexik_jwt_authentication.encoder")->encode(array("username" => $username, "exp" => $expirationTime));
-            	
-			        
-			        $loginTrace = new LoginTrace();
-		          $loginTrace->setUser($user);
-		          $loginTrace->setDate(new \DateTime());
-		          $loginTrace->setLoginToken($loginToken);
+        );
 
-		          $em->persist($loginTrace);
-		          $em->flush();
-
-		          $_status = "OK";
-						}  
-            
-          }else{
-            $_status = "ERR";
-            $_err = "NO_MATCHING_TOKEN";
-          }
-
-        }else{
-          $_status = "ERR";
-          $_err = "NO_MATCHING_USER";
-        }
-
+        $response = new JsonResponse($responseData);
+        return $response;
+    }
+    
+    
+    
+    #[Route('/api/check_login_status', name: 'app_check_login_status')]
+    public function checkLoginStatus(Request $request): JsonResponse
+    {
+				$user = $this->getUser();
+				
         $responseData = array(
-          "status" => $_status,
-          "error" => $_err,
-          "token" => $_token
+          "status" => "ALREADY_LOGGED",
+          "user_name" => $user->getName(),
+	      	"user_roles" => $user->getRoles()
         );
 
         $response = new JsonResponse($responseData);
@@ -201,9 +106,4 @@ class SecurityController extends AbstractController
     }
 
 
-    #[Route('/api/logout', name: 'app_logout')]
-    public function logout()
-    {
-        throw new \Exception('This method can be blank - it will be intercepted by the logout key on your firewall');
-    }
 }
