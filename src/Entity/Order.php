@@ -20,10 +20,6 @@ class Order
      */
     private $id;
 
-    /**
-     * @ORM\Column(type="string", length=255)
-     */
-    private $orderNumber;
 
     /**
      * @ORM\Column(type="string", length=255)
@@ -46,10 +42,10 @@ class Order
     private $customerAddress;
 
     /**
-     * @ORM\ManyToOne(targetEntity=Commune::class, inversedBy="orders")
+     * @ORM\ManyToOne(targetEntity=Wilaya::class, inversedBy="orders")
      * @ORM\JoinColumn(nullable=false)
      */
-    private $commune;
+    private $wilaya;
 
     /**
      * @ORM\Column(type="integer")
@@ -156,17 +152,6 @@ class Order
         return $this->id;
     }
 
-    public function getOrderNumber(): ?string
-    {
-        return $this->orderNumber;
-    }
-
-    public function setOrderNumber(string $orderNumber): self
-    {
-        $this->orderNumber = $orderNumber;
-
-        return $this;
-    }
 
     public function getCustomerName(): ?string
     {
@@ -216,14 +201,14 @@ class Order
         return $this;
     }
 
-    public function getCommune(): ?Commune
+    public function getWilaya(): ?Wilaya
     {
-        return $this->commune;
+        return $this->wilaya;
     }
 
-    public function setCommune(?Commune $commune): self
+    public function setWilaya(?Wilaya $wilaya): self
     {
-        $this->commune = $commune;
+        $this->wilaya = $wilaya;
 
         return $this;
     }
@@ -418,39 +403,6 @@ class Order
 
 
 
-    ////////////////////////////////////////////////////////////////////////////
-
-
-    public function buildJSONArray(): array
-    {
-      $_arr = array();
-
-      $_arr["id"] = $this->getId();
-      $_arr["order_number"] = $this->getOrderNumber();
-      $_arr["customer_name"] = $this->getCustomerName();
-      $_arr["customer_phone"] = $this->getCustomerPhone();
-      $_arr["customer_email"] = $this->getCustomerEmail();
-      $_arr["customer_address"] = $this->getCustomerAddress();
-      $_arr["commune"] = $this->getCommune()->buildJSONArray();
-      $_arr["quantity_standard"] = $this->getQuantityStandard();
-      $_arr["quantity_caramel"] = $this->getQuantityCaramel();
-      $_arr["total_price"] = $this->getTotalPrice();
-      $_arr["delivery_barcode"] = $this->getDeliveryBarcode();
-      $_arr["status"] = $this->getStatus();
-      $_arr["save_date"] = $this->getSaveDate()->format('Y-m-d H:i:s');
-      $_arr["validated_by"] = $this->getValidatedBy() ? $this->getValidatedBy()->buildJSONArray() : null;
-      $_arr["validation_date"] = $this->getValidationDate() ? $this->getValidationDate()->format('Y-m-d H:i:s') : null;
-      $_arr["shipped_by"] = $this->getShippeddBy() ? $this->getShippeddBy()->buildJSONArray() : null;
-      $_arr["shipping_date"] = $this->getShippingDate() ? $this->getShippingDate()->format('Y-m-d H:i:s') : null;
-      $_arr["delivered_by"] = $this->getDeliveredBy() ? $this->getDeliveredBy()->buildJSONArray() : null;
-      $_arr["delivery_date"] = $this->getDeliveryDate() ? $this->getDeliveryDate()->format('Y-m-d H:i:s') : null;
-      $_arr["returned_by"] = $this->getReturnedBy() ? $this->getReturnedBy()->buildJSONArray() : null;
-      $_arr["return_date"] = $this->getReturnDate() ? $this->getReturnDate()->format('Y-m-d H:i:s') : null;
-      $_arr["review"] = $this->getReview() ? $this->getReview()->buildJSONArray() : null;
-
-      return $_arr;
-    }
-
     public function getEntrustedTo(): ?User
     {
         return $this->entrustedTo;
@@ -515,6 +467,40 @@ class Order
         $this->picture = $picture;
 
         return $this;
+    }
+    
+    
+
+    ////////////////////////////////////////////////////////////////////////////
+
+
+    public function buildJSONArray(): array
+    {
+      $_arr = array();
+
+      $_arr["id"] = $this->getId();
+      $_arr["customer_name"] = $this->getCustomerName();
+      $_arr["customer_phone"] = $this->getCustomerPhone();
+      $_arr["customer_email"] = $this->getCustomerEmail();
+      $_arr["customer_address"] = $this->getCustomerAddress();
+      $_arr["wilaya"] = $this->getWilaya()->buildJSONArray();
+      $_arr["quantity_standard"] = $this->getQuantityStandard();
+      $_arr["quantity_caramel"] = $this->getQuantityCaramel();
+      $_arr["total_price"] = $this->getTotalPrice();
+      $_arr["delivery_barcode"] = $this->getDeliveryBarcode();
+      $_arr["status"] = $this->getStatus();
+      $_arr["save_date"] = $this->getSaveDate()->format('Y-m-d H:i:s');
+      $_arr["validated_by"] = $this->getValidatedBy() ? $this->getValidatedBy()->buildJSONArray() : null;
+      $_arr["validation_date"] = $this->getValidationDate() ? $this->getValidationDate()->format('Y-m-d H:i:s') : null;
+      $_arr["shipped_by"] = $this->getShippeddBy() ? $this->getShippeddBy()->buildJSONArray() : null;
+      $_arr["shipping_date"] = $this->getShippingDate() ? $this->getShippingDate()->format('Y-m-d H:i:s') : null;
+      $_arr["delivered_by"] = $this->getDeliveredBy() ? $this->getDeliveredBy()->buildJSONArray() : null;
+      $_arr["delivery_date"] = $this->getDeliveryDate() ? $this->getDeliveryDate()->format('Y-m-d H:i:s') : null;
+      $_arr["returned_by"] = $this->getReturnedBy() ? $this->getReturnedBy()->buildJSONArray() : null;
+      $_arr["return_date"] = $this->getReturnDate() ? $this->getReturnDate()->format('Y-m-d H:i:s') : null;
+      $_arr["review"] = $this->getReview() ? $this->getReview()->buildJSONArray() : null;
+
+      return $_arr;
     }
 
 }
